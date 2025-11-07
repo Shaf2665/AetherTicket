@@ -1,0 +1,9 @@
+{
+  "botName": "AetherTicket",
+  "avatar": "./avatar.png",
+  "embedColor": "#5865F2",
+  "footerText": "Powered by AetherPanel",
+  "ticketCategory": "Support Tickets",
+  "supportRole": "Support"
+}
+

@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AetherTicket Configuration</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      padding: 40px;
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+    }
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+    }
+    .section {
+      margin-bottom: 30px;
+    }
+    .section h2 {
+      color: #333;
+      font-size: 18px;
+      margin-bottom: 15px;
+      border-bottom: 2px solid #667eea;
+      padding-bottom: 5px;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      color: #555;
+      font-weight: 500;
+      margin-bottom: 5px;
+    }
+    input[type="text"],
+    input[type="color"],
+    textarea {
+      width: 100%;
+      padding: 10px;
+      border: 2px solid #e0e0e0;
+      border-radius: 6px;
+      font-size: 14px;
+      transition: border-color 0.3s;
+    }
+    input[type="text"]:focus,
+    input[type="color"]:focus,
+    textarea:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    .avatar-preview {
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+    .avatar-preview img {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      border: 2px solid #e0e0e0;
+    }
+    .file-upload {
+      margin-top: 10px;
+    }
+    .file-upload input[type="file"] {
+      display: none;
+    }
+    .file-upload label {
+      display: inline-block;
+      padding: 10px 20px;
+      background: #667eea;
+      color: white;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    .file-upload label:hover {
+      background: #5568d3;
+    }
+    button {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 12px 30px;
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.3s;
+      width: 100%;
+    }
+    button:hover {
+      background: #5568d3;
+    }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .status {
+      margin-top: 15px;
+      padding: 10px;
+      border-radius: 6px;
+      display: none;
+    }
+    .status.success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    .status.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    .bot-info {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+    }
+    .bot-info p {
+      margin: 5px 0;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>⚙️ AetherTicket Configuration</h1>
+    <p class="subtitle">Customize your bot's appearance and behavior</p>
+
+    <div class="bot-info">
+      <p><strong>Bot Status:</strong> <%= botTag %></p>
+      <% if (botAvatar) { %>
+        <p><strong>Current Avatar:</strong> <img src="<%= botAvatar %>" alt="Bot Avatar" style="width: 32px; height: 32px; border-radius: 50%; vertical-align: middle; margin-left: 10px;"></p>
+      <% } %>
+    </div>
+
+    <form id="configForm">
+      <div class="section">
+        <h2>Bot Appearance</h2>
+        
+        <div class="form-group">
+          <label for="botName">Bot Name</label>
+          <input type="text" id="botName" name="botName" value="<%= botName %>" required>
+        </div>
+
+        <div class="form-group">
+          <label for="embedColor">Embed Color</label>
+          <input type="color" id="embedColor" name="embedColor" value="<%= embedColor %>">
+        </div>
+
+        <div class="form-group">
+          <label for="footerText">Footer Text</label>
+          <input type="text" id="footerText" name="footerText" value="<%= footerText %>">
+        </div>
+
+        <div class="form-group">
+          <label>Avatar</label>
+          <% if (avatarPath) { %>
+            <div class="avatar-preview">
+              <img src="/avatar.png" alt="Current Avatar" id="avatarPreview">
+              <span>Current avatar</span>
+            </div>
+          <% } %>
+          <div class="file-upload">
+            <label for="avatarUpload">Upload New Avatar</label>
+            <input type="file" id="avatarUpload" name="avatar" accept="image/*">
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Ticket Settings</h2>
+        
+        <div class="form-group">
+          <label for="ticketCategory">Ticket Category Name</label>
+          <input type="text" id="ticketCategory" name="ticketCategory" value="<%= ticketCategory %>" required>
+        </div>
+
+        <div class="form-group">
+          <label for="supportRole">Support Role Name</label>
+          <input type="text" id="supportRole" name="supportRole" value="<%= supportRole %>" required>
+        </div>
+      </div>
+
+      <button type="submit">Save Configuration</button>
+      <div class="status" id="status"></div>
+    </form>
+  </div>
+
+  <script>
+    const form = document.getElementById('configForm');
+    const status = document.getElementById('status');
+    const avatarUpload = document.getElementById('avatarUpload');
+    const avatarPreview = document.getElementById('avatarPreview');
+
+    // Handle avatar preview
+    if (avatarUpload) {
+      avatarUpload.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            if (avatarPreview) {
+              avatarPreview.src = e.target.result;
+            }
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+    }
+
+    // Handle form submission
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const formData = new FormData(form);
+      const avatarFile = avatarUpload?.files[0];
+      
+      // Upload avatar if changed
+      if (avatarFile) {
+        const avatarFormData = new FormData();
+        avatarFormData.append('avatar', avatarFile);
+        
+        try {
+          const avatarRes = await fetch('/api/avatar', {
+            method: 'POST',
+            body: avatarFormData
+          });
+          
+          if (!avatarRes.ok) {
+            throw new Error('Failed to upload avatar');
+          }
+        } catch (error) {
+          showStatus('Error uploading avatar: ' + error.message, 'error');
+          return;
+        }
+      }
+      
+      // Update config
+      const configData = {
+        botName: formData.get('botName'),
+        embedColor: formData.get('embedColor'),
+        footerText: formData.get('footerText'),
+        ticketCategory: formData.get('ticketCategory'),
+        supportRole: formData.get('supportRole')
+      };
+      
+      try {
+        const res = await fetch('/api/config', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(configData)
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+          showStatus('Configuration saved successfully!', 'success');
+        } else {
+          showStatus('Error: ' + (data.error || 'Failed to save configuration'), 'error');
+        }
+      } catch (error) {
+        showStatus('Error: ' + error.message, 'error');
+      }
+    });
+
+    function showStatus(message, type) {
+      status.textContent = message;
+      status.className = 'status ' + type;
+      status.style.display = 'block';
+      
+      setTimeout(() => {
+        status.style.display = 'none';
+      }, 5000);
+    }
+  </script>
+</body>
+</html>
+
