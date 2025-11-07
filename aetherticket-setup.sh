@@ -2,11 +2,12 @@
 
 set -euo pipefail
 
-SCRIPT_VERSION="2.3.6"
+SCRIPT_VERSION="2.4.0"
 INSTALL_DIR_DEFAULT="$HOME/AetherTicket"
 LOG_FILE="/tmp/aetherticket-install.log"
 LOCK_FILE="/tmp/aetherticket-install.lock"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_URL="https://github.com/Shaf2665/AetherTicket.git"
+VERSION="${1:-main}"
 
 umask 077
 
@@ -25,9 +26,6 @@ log_error() { log "ERROR" "$@" 1>&2; }
 
 cleanup() {
   local exit_code=$?
-  if [[ -n "${STAGING_DIR:-}" && -d "$STAGING_DIR" ]]; then
-    rm -rf "$STAGING_DIR"
-  fi
   if [[ -n "${LOCK_FD:-}" ]]; then
     flock -u "$LOCK_FD" 2>/dev/null || true
   fi
@@ -39,17 +37,13 @@ trap cleanup EXIT
 
 log_info "=========================================="
 log_info " AetherTicket Setup (v$SCRIPT_VERSION)"
+log_info " Target ref: $VERSION"
 log_info "=========================================="
 
 # Acquire lock to prevent concurrent installations
 exec {LOCK_FD}>"$LOCK_FILE"
 if ! flock -n "$LOCK_FD"; then
   log_error "Another installation is currently running. Please try again later."
-  exit 1
-fi
-
-if [[ ! -f "$SCRIPT_DIR/package.json" ]]; then
-  log_error "Setup script must be executed from the AetherTicket project directory."
   exit 1
 fi
 
@@ -64,14 +58,7 @@ require_cmd() {
 log_info "Checking prerequisites..."
 require_cmd node
 require_cmd npm
-require_cmd tar
-
-if command -v rsync >/dev/null 2>&1; then
-  COPY_TOOL="rsync"
-else
-  log_warn "'rsync' not found. Falling back to 'cp -R'. Install rsync for faster updates."
-  COPY_TOOL="cp"
-fi
+require_cmd git
 
 # Node.js version check
 NODE_VERSION="$(node -v | sed 's/^v//')"
@@ -109,6 +96,22 @@ prompt_optional() {
 
 INSTALL_DIR="${AETHERTICKET_INSTALL_DIR:-$INSTALL_DIR_DEFAULT}"
 log_info "Installation directory: $INSTALL_DIR"
+
+if [[ -d "$INSTALL_DIR/.git" ]]; then
+  log_warn "Existing Git repository detected at $INSTALL_DIR"
+  read -r -p "Reuse existing repository and reset to '$VERSION'? (Y/n): " reuse_repo
+  reuse_repo=${reuse_repo:-Y}
+  if [[ ! "$reuse_repo" =~ ^[Yy]$ ]]; then
+    log_error "Installation aborted by user to avoid overwriting existing repository."
+    exit 1
+  fi
+fi
+
+if [[ -d "$INSTALL_DIR" && ! -d "$INSTALL_DIR/.git" && -n "$(ls -A "$INSTALL_DIR" 2>/dev/null)" ]]; then
+  log_error "Installation directory is not empty. Please back up and remove it or set AETHERTICKET_INSTALL_DIR."
+  exit 1
+fi
+
 mkdir -p "$INSTALL_DIR"
 
 ENV_FILE="$INSTALL_DIR/.env"
@@ -158,38 +161,28 @@ else
   log_info "Reusing existing credentials."
 fi
 
-log_info "Preparing application files..."
-STAGING_DIR="$(mktemp -d)"
-
-EXCLUDES=(
-  "--exclude" ".git"
-  "--exclude" "node_modules"
-  "--exclude" "dist"
-  "--exclude" "data"
-  "--exclude" "logs"
-  "--exclude" "uploads"
-  "--exclude" "audit-report.txt"
-  "--exclude" "*.log"
-)
-
-if [[ "$COPY_TOOL" == "rsync" ]]; then
-  rsync -a --delete "${EXCLUDES[@]}" "$SCRIPT_DIR/" "$STAGING_DIR/"
+log_info "Cloning AetherTicket source from GitHub..."
+if [[ -d "$INSTALL_DIR/.git" ]]; then
+  git -C "$INSTALL_DIR" fetch --tags --prune origin
+  if git -C "$INSTALL_DIR" rev-parse --verify "origin/$VERSION" >/dev/null 2>&1; then
+    git -C "$INSTALL_DIR" checkout "$VERSION" 2>/dev/null || git -C "$INSTALL_DIR" checkout -B "$VERSION" "origin/$VERSION"
+    git -C "$INSTALL_DIR" reset --hard "origin/$VERSION"
+  elif git -C "$INSTALL_DIR" rev-parse --verify "refs/tags/$VERSION" >/dev/null 2>&1; then
+    git -C "$INSTALL_DIR" checkout -f "tags/$VERSION"
+  else
+    log_error "Ref '$VERSION' not found in existing repository."
+    exit 1
+  fi
 else
-  (cd "$SCRIPT_DIR" && tar cf - .) | (cd "$STAGING_DIR" && tar xf -)
-  rm -rf "$STAGING_DIR/.git" "$STAGING_DIR/node_modules" "$STAGING_DIR/dist" "$STAGING_DIR/data" "$STAGING_DIR/logs" "$STAGING_DIR/uploads"
-fi
-
-# Ensure staging config example is available
-if [[ ! -f "$STAGING_DIR/config.example.json" ]]; then
-  log_error "config.example.json missing from source."
-  exit 1
-fi
-
-# Copy staged files into installation directory while preserving user data
-if [[ "$COPY_TOOL" == "rsync" ]]; then
-  rsync -a --delete "${EXCLUDES[@]}" "$STAGING_DIR/" "$INSTALL_DIR/"
-else
-  (cd "$STAGING_DIR" && tar cf - .) | (cd "$INSTALL_DIR" && tar xf -)
+  rm -rf "$INSTALL_DIR"
+  if ! git clone --single-branch --branch "$VERSION" "$REPO_URL" "$INSTALL_DIR" 2>/dev/null; then
+    log_warn "Failed to clone ref '$VERSION' directly; falling back to cloning default branch."
+    git clone "$REPO_URL" "$INSTALL_DIR"
+    if ! git -C "$INSTALL_DIR" checkout -f "$VERSION"; then
+      log_error "Unable to checkout ref '$VERSION' after cloning."
+      exit 1
+    fi
+  fi
 fi
 
 # Ensure essential directories exist with secure permissions
@@ -210,6 +203,9 @@ npm install --no-fund --no-audit
 
 log_info "Building TypeScript assets..."
 npm run build
+
+log_info "Pruning development dependencies..."
+npm prune --omit=dev || log_warn "npm prune failed; continuing with installed packages"
 
 log_info "Initializing database if required..."
 node - <<'NODE'
