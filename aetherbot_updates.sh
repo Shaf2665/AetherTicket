@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-SCRIPT_VERSION="2.4.1"
+SCRIPT_VERSION="2.4.2"
 INSTALL_DIR_DEFAULT="$HOME/AetherTicket"
 BACKUP_ROOT="$HOME/AetherTicket_backups"
 LOG_FILE="/tmp/aetherticket-update.log"

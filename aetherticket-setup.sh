@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-SCRIPT_VERSION="2.4.1"
+SCRIPT_VERSION="2.4.2"
 INSTALL_DIR_DEFAULT="$HOME/AetherTicket"
 LOG_FILE="/tmp/aetherticket-install.log"
 LOCK_FILE="/tmp/aetherticket-install.lock"
