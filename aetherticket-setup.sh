@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-SCRIPT_VERSION="2.4.4"
+SCRIPT_VERSION="2.4.5"
 INSTALL_DIR_DEFAULT="$HOME/AetherTicket"
 LOG_FILE="/tmp/aetherticket-install.log"
 LOCK_FILE="/tmp/aetherticket-install.lock"
@@ -511,6 +511,15 @@ EOF
 }
 
 log_info "Cloning AetherTicket source from GitHub..."
+
+# Backup .env file if it exists before git operations
+ENV_BACKUP=""
+if [[ -f "$ENV_FILE" ]]; then
+  ENV_BACKUP=$(mktemp)
+  cp "$ENV_FILE" "$ENV_BACKUP"
+  log_info "Backed up existing .env file before git operations."
+fi
+
 if [[ -d "$INSTALL_DIR/.git" ]]; then
   git -C "$INSTALL_DIR" fetch --tags --prune origin
   if git -C "$INSTALL_DIR" rev-parse --verify "origin/$VERSION" >/dev/null 2>&1; then
@@ -535,10 +544,18 @@ else
 fi
 
 # Write .env file after git clone completes (to avoid deletion during fresh install)
-if [[ "$reuse_env" == true ]] && [[ -f "$ENV_FILE" ]]; then
+if [[ "$reuse_env" == true ]] && [[ -n "$ENV_BACKUP" ]] && [[ -f "$ENV_BACKUP" ]]; then
+  # Restore .env file from backup
+  cp "$ENV_BACKUP" "$ENV_FILE"
+  chmod 600 "$ENV_FILE"
+  rm -f "$ENV_BACKUP"
+  log_info "Restored .env file from backup."
+elif [[ "$reuse_env" == true ]] && [[ -f "$ENV_FILE" ]]; then
   log_info "Reusing existing credentials from .env file."
 else
   write_env_file
+  # Clean up backup if it exists
+  [[ -n "$ENV_BACKUP" ]] && rm -f "$ENV_BACKUP"
 fi
 
 # Ensure essential directories exist with secure permissions
