@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-SCRIPT_VERSION="2.4.5"
+SCRIPT_VERSION="2.4.6"
 INSTALL_DIR_DEFAULT="$HOME/AetherTicket"
 LOG_FILE="/tmp/aetherticket-install.log"
 LOCK_FILE="/tmp/aetherticket-install.lock"
@@ -428,7 +428,7 @@ prompt_secret() {
   local prompt="$1"
   local var
   while true; do
-    read -r -s -p "$prompt" var
+    read -r -p "$prompt" var
     echo
     if [[ -n "$var" ]]; then
       printf '%s' "$var"
