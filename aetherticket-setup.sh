@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-SCRIPT_VERSION="2.4.6"
+SCRIPT_VERSION="2.4.7"
 INSTALL_DIR_DEFAULT="$HOME/AetherTicket"
 LOG_FILE="/tmp/aetherticket-install.log"
 LOCK_FILE="/tmp/aetherticket-install.lock"
@@ -499,15 +499,111 @@ PORT_VALUE="$(prompt_optional "Preferred Web UI port [${PORT_DEFAULT}]: " "$PORT
 
 write_env_file() {
   local tmp_file="$ENV_FILE.tmp"
+  
+  # Validate that required variables are set
+  if [[ -z "$DISCORD_TOKEN" ]]; then
+    log_error "DISCORD_TOKEN is empty. Cannot create .env file."
+    exit 1
+  fi
+  
+  if [[ -z "$CLIENT_ID" ]]; then
+    log_error "CLIENT_ID is empty. Cannot create .env file."
+    exit 1
+  fi
+  
+  # Create .env file
   cat >"$tmp_file" <<EOF
 DISCORD_TOKEN=$DISCORD_TOKEN
 CLIENT_ID=$CLIENT_ID
 GUILD_ID=${GUILD_ID}
 PORT=${PORT_VALUE}
 EOF
-  mv "$tmp_file" "$ENV_FILE"
-  chmod 600 "$ENV_FILE"
+  
+  # Verify file was created successfully
+  if [[ ! -f "$tmp_file" ]]; then
+    log_error "Failed to create temporary .env file."
+    exit 1
+  fi
+  
+  # Move to final location
+  if ! mv "$tmp_file" "$ENV_FILE"; then
+    log_error "Failed to move .env file to final location."
+    exit 1
+  fi
+  
+  # Set secure permissions
+  if ! chmod 600 "$ENV_FILE"; then
+    log_error "Failed to set permissions on .env file."
+    exit 1
+  fi
+  
+  # Verify file exists and has correct permissions
+  if [[ ! -f "$ENV_FILE" ]]; then
+    log_error ".env file was not created successfully."
+    exit 1
+  fi
+  
+  local file_perms
+  file_perms=$(stat -c "%a" "$ENV_FILE" 2>/dev/null || stat -f "%OLp" "$ENV_FILE" 2>/dev/null || echo "unknown")
+  if [[ "$file_perms" != "600" ]]; then
+    log_warn ".env file permissions are $file_perms (expected 600). Attempting to fix..."
+    chmod 600 "$ENV_FILE" || log_warn "Could not fix permissions."
+  fi
+  
   log_info "Saved credentials to .env (permissions set to 600)."
+}
+
+validate_env_file() {
+  log_info "Validating .env file..."
+  
+  # Check if file exists
+  if [[ ! -f "$ENV_FILE" ]]; then
+    log_error ".env file does not exist at $ENV_FILE"
+    log_error "Please re-run the installer."
+    exit 1
+  fi
+  
+  # Check file permissions
+  local file_perms
+  file_perms=$(stat -c "%a" "$ENV_FILE" 2>/dev/null || stat -f "%OLp" "$ENV_FILE" 2>/dev/null || echo "unknown")
+  if [[ "$file_perms" != "600" ]]; then
+    log_warn ".env file permissions are $file_perms (expected 600). Fixing..."
+    chmod 600 "$ENV_FILE" || {
+      log_error "Failed to set correct permissions on .env file."
+      exit 1
+    }
+  fi
+  
+  # Check for required variables
+  if ! grep -q "^DISCORD_TOKEN=" "$ENV_FILE"; then
+    log_error ".env file is missing DISCORD_TOKEN variable."
+    log_error "Please re-run the installer."
+    exit 1
+  fi
+  
+  if ! grep -q "^CLIENT_ID=" "$ENV_FILE"; then
+    log_error ".env file is missing CLIENT_ID variable."
+    log_error "Please re-run the installer."
+    exit 1
+  fi
+  
+  # Check that values are not empty
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  
+  if [[ -z "${DISCORD_TOKEN:-}" ]]; then
+    log_error "DISCORD_TOKEN is empty in .env file."
+    log_error "Please re-run the installer and provide a valid Discord Bot Token."
+    exit 1
+  fi
+  
+  if [[ -z "${CLIENT_ID:-}" ]]; then
+    log_error "CLIENT_ID is empty in .env file."
+    log_error "Please re-run the installer and provide a valid Client ID."
+    exit 1
+  fi
+  
+  log_info ".env file validation passed ✓"
 }
 
 log_info "Cloning AetherTicket source from GitHub..."
@@ -550,10 +646,13 @@ if [[ "$reuse_env" == true ]] && [[ -n "$ENV_BACKUP" ]] && [[ -f "$ENV_BACKUP" ]
   chmod 600 "$ENV_FILE"
   rm -f "$ENV_BACKUP"
   log_info "Restored .env file from backup."
+  validate_env_file
 elif [[ "$reuse_env" == true ]] && [[ -f "$ENV_FILE" ]]; then
   log_info "Reusing existing credentials from .env file."
+  validate_env_file
 else
   write_env_file
+  validate_env_file
   # Clean up backup if it exists
   [[ -n "$ENV_BACKUP" ]] && rm -f "$ENV_BACKUP"
 fi
@@ -608,6 +707,17 @@ detect_firewall() {
 }
 
 detect_firewall "$PORT_VALUE"
+
+# Final sanity check before installation completion
+log_info "Performing final validation..."
+if [[ ! -f "$ENV_FILE" ]]; then
+  log_error ".env file is missing at $ENV_FILE"
+  log_error "Installation cannot complete without a valid .env file."
+  log_error "Please re-run the installer."
+  exit 1
+fi
+
+validate_env_file
 
 log_info "=========================================="
 log_info " AetherTicket installed successfully!"
