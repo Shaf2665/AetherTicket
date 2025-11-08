@@ -58,6 +58,16 @@ app.use(express_1.default.urlencoded({ extended: true, limit: jsonLimit }));
 app.use((0, helmet_1.default)({
     crossOriginEmbedderPolicy: false,
     crossOriginResourcePolicy: { policy: 'same-origin' },
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'"],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            imgSrc: ["'self'", "data:", "https://cdn.discordapp.com"],
+            formAction: ["'self'"],
+            connectSrc: ["'self'"],
+        },
+    },
 }));
 app.use((req, res, next) => {
     res.setHeader('Cache-Control', 'no-store');

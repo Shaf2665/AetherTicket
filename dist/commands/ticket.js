@@ -37,16 +37,25 @@ async function execute(interaction, config) {
                 });
                 logger_1.logger.info(`Created ticket category: ${config.ticketCategory}`);
             }
-            // Check if user already has an open ticket
+            // Check if user already has an open ticket (check both cache and database)
             const existingTicket = guild.channels.cache.find((ch) => ch.type === discord_js_1.ChannelType.GuildText &&
                 ch.name === `ticket-${user.id}` &&
                 ch.parentId === category.id);
             if (existingTicket) {
-                await interaction.reply({
-                    content: `You already have an open ticket: ${existingTicket}`,
-                    ephemeral: true,
-                });
-                return;
+                // Also check database to ensure it's a valid ticket
+                try {
+                    const ticketInfo = await (0, database_1.getTicketInfo)(existingTicket.id);
+                    if (ticketInfo && !ticketInfo.closed_at) {
+                        await interaction.reply({
+                            content: `You already have an open ticket: ${existingTicket}`,
+                            ephemeral: true,
+                        });
+                        return;
+                    }
+                }
+                catch (error) {
+                    logger_1.logger.warn('Failed to check ticket in database, proceeding with cache check:', error);
+                }
             }
             // Create ticket channel
             const ticketChannel = await guild.channels.create({
@@ -86,13 +95,20 @@ async function execute(interaction, config) {
                 .setTimestamp();
             await ticketChannel.send({ embeds: [embed] });
             await ticketChannel.send(`<@${user.id}>`);
-            // Log to database
-            await (0, database_1.createTicket)(ticketChannel.id, user.id);
+            // Log to database (handle errors gracefully)
+            try {
+                await (0, database_1.createTicket)(ticketChannel.id, user.id);
+                logger_1.logger.info(`Ticket created: ${ticketChannel.id} for user ${user.id}`);
+            }
+            catch (error) {
+                logger_1.logger.error(`Failed to create ticket record in database: ${error}`);
+                // Continue anyway - the channel was created successfully
+                // The ticket can still be used, but won't be tracked in the database
+            }
             await interaction.reply({
                 content: `Ticket created: ${ticketChannel}`,
                 ephemeral: true,
             });
-            logger_1.logger.info(`Ticket created: ${ticketChannel.id} for user ${user.id}`);
         }
         else if (subcommand === 'close') {
             const channel = interaction.channel;
@@ -104,8 +120,30 @@ async function execute(interaction, config) {
                 return;
             }
             const textChannel = channel;
-            // Check if this is a ticket channel
-            const ticketInfo = await (0, database_1.getTicketInfo)(textChannel.id);
+            // Check if this is a ticket channel (check database first, then fallback to name pattern)
+            let ticketInfo;
+            try {
+                ticketInfo = await (0, database_1.getTicketInfo)(textChannel.id);
+            }
+            catch (error) {
+                logger_1.logger.warn('Failed to check ticket in database, using fallback check:', error);
+            }
+            // Fallback: check if channel name matches ticket pattern
+            if (!ticketInfo && textChannel.name.startsWith('ticket-')) {
+                // Try to extract user ID from channel name
+                const userIdMatch = textChannel.name.match(/^ticket-(\d+)$/);
+                if (userIdMatch) {
+                    // This looks like a ticket channel, create a record if it doesn't exist
+                    try {
+                        await (0, database_1.createTicket)(textChannel.id, userIdMatch[1]);
+                        ticketInfo = await (0, database_1.getTicketInfo)(textChannel.id);
+                        logger_1.logger.info(`Created missing ticket record for channel: ${textChannel.id}`);
+                    }
+                    catch (error) {
+                        logger_1.logger.warn('Failed to create ticket record for existing channel:', error);
+                    }
+                }
+            }
             if (!ticketInfo) {
                 await interaction.reply({
                     content: 'This is not a ticket channel!',
@@ -127,9 +165,15 @@ async function execute(interaction, config) {
                 .setFooter({ text: config.footerText })
                 .setTimestamp();
             await interaction.reply({ embeds: [embed] });
-            // Close ticket in database
-            await (0, database_1.closeTicket)(textChannel.id, transcript);
-            logger_1.logger.info(`Ticket closed: ${textChannel.id}`);
+            // Close ticket in database (handle errors gracefully)
+            try {
+                await (0, database_1.closeTicket)(textChannel.id, transcript);
+                logger_1.logger.info(`Ticket closed: ${textChannel.id}`);
+            }
+            catch (error) {
+                logger_1.logger.error(`Failed to close ticket in database: ${error}`);
+                // Continue anyway - the channel will still be deleted
+            }
             // Delete channel after delay
             setTimeout(async () => {
                 try {
@@ -151,8 +195,28 @@ async function execute(interaction, config) {
             }
             const textChannel = channel;
             const userToAdd = interaction.options.getUser('user', true);
-            // Check if this is a ticket channel
-            const ticketInfo = await (0, database_1.getTicketInfo)(textChannel.id);
+            // Check if this is a ticket channel (check database first, then fallback to name pattern)
+            let ticketInfo;
+            try {
+                ticketInfo = await (0, database_1.getTicketInfo)(textChannel.id);
+            }
+            catch (error) {
+                logger_1.logger.warn('Failed to check ticket in database, using fallback check:', error);
+            }
+            // Fallback: check if channel name matches ticket pattern
+            if (!ticketInfo && textChannel.name.startsWith('ticket-')) {
+                const userIdMatch = textChannel.name.match(/^ticket-(\d+)$/);
+                if (userIdMatch) {
+                    try {
+                        await (0, database_1.createTicket)(textChannel.id, userIdMatch[1]);
+                        ticketInfo = await (0, database_1.getTicketInfo)(textChannel.id);
+                        logger_1.logger.info(`Created missing ticket record for channel: ${textChannel.id}`);
+                    }
+                    catch (error) {
+                        logger_1.logger.warn('Failed to create ticket record for existing channel:', error);
+                    }
+                }
+            }
             if (!ticketInfo) {
                 await interaction.reply({
                     content: 'This is not a ticket channel!',
@@ -187,8 +251,28 @@ async function execute(interaction, config) {
                 return;
             }
             const textChannel = channel;
-            // Get ticket info from database
-            const ticketInfo = await (0, database_1.getTicketInfo)(textChannel.id);
+            // Get ticket info from database (check database first, then fallback to name pattern)
+            let ticketInfo;
+            try {
+                ticketInfo = await (0, database_1.getTicketInfo)(textChannel.id);
+            }
+            catch (error) {
+                logger_1.logger.warn('Failed to check ticket in database, using fallback check:', error);
+            }
+            // Fallback: check if channel name matches ticket pattern
+            if (!ticketInfo && textChannel.name.startsWith('ticket-')) {
+                const userIdMatch = textChannel.name.match(/^ticket-(\d+)$/);
+                if (userIdMatch) {
+                    try {
+                        await (0, database_1.createTicket)(textChannel.id, userIdMatch[1]);
+                        ticketInfo = await (0, database_1.getTicketInfo)(textChannel.id);
+                        logger_1.logger.info(`Created missing ticket record for channel: ${textChannel.id}`);
+                    }
+                    catch (error) {
+                        logger_1.logger.warn('Failed to create ticket record for existing channel:', error);
+                    }
+                }
+            }
             if (!ticketInfo) {
                 await interaction.reply({
                     content: 'This is not a ticket channel!',
