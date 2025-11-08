@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-SCRIPT_VERSION="2.4.2"
+SCRIPT_VERSION="2.4.3"
 INSTALL_DIR_DEFAULT="$HOME/AetherTicket"
 BACKUP_ROOT="$HOME/AetherTicket_backups"
 LOG_FILE="/tmp/aetherticket-update.log"
@@ -92,6 +92,47 @@ check_sudo() {
   fi
 }
 
+# Fix interrupted dpkg state (Ubuntu/Debian only)
+fix_dpkg_state() {
+  if ! command -v dpkg >/dev/null 2>&1; then
+    return 0  # Not a Debian-based system
+  fi
+  
+  # Check if dpkg is interrupted
+  if dpkg --audit 2>/dev/null | grep -q "interrupted"; then
+    log_warn "dpkg was interrupted. Attempting to fix..."
+    if sudo dpkg --configure -a; then
+      log_info "dpkg state fixed successfully."
+      return 0
+    else
+      log_error "Failed to fix dpkg state automatically."
+      log_error "Please run manually: sudo dpkg --configure -a"
+      return 1
+    fi
+  fi
+  
+  # Also check for lock files
+  if [[ -f /var/lib/dpkg/lock-frontend ]] || [[ -f /var/lib/dpkg/lock ]]; then
+    log_warn "dpkg lock files detected. Attempting to fix..."
+    if sudo rm -f /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/cache/apt/archives/lock 2>/dev/null; then
+      if sudo dpkg --configure -a; then
+        log_info "dpkg state fixed successfully."
+        return 0
+      else
+        log_error "Failed to fix dpkg state automatically."
+        log_error "Please run manually: sudo dpkg --configure -a"
+        return 1
+      fi
+    else
+      log_warn "Could not remove dpkg lock files. They may be in use."
+      log_warn "Please wait a moment and try again, or run: sudo dpkg --configure -a"
+      return 1
+    fi
+  fi
+  
+  return 0
+}
+
 # Install Node.js via NodeSource
 install_nodejs_nodesource() {
   local distro="$1"
@@ -127,6 +168,13 @@ install_nodejs_nodesource() {
   case "$distro" in
     ubuntu)
       if command -v curl >/dev/null 2>&1; then
+        # Fix dpkg state before installation
+        fix_dpkg_state || {
+          log_error "Cannot proceed with Node.js installation due to dpkg issues."
+          log_error "Please fix dpkg state manually and run this script again."
+          exit 1
+        }
+        
         curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - || {
           log_error "Failed to add NodeSource repository."
           exit 1
@@ -228,6 +276,13 @@ install_git() {
   
   case "$distro" in
     ubuntu)
+      # Fix dpkg state before installation
+      fix_dpkg_state || {
+        log_error "Cannot proceed with Git installation due to dpkg issues."
+        log_error "Please fix dpkg state manually and run this script again."
+        exit 1
+      }
+      
       sudo apt update || {
         log_error "Failed to update package list."
         exit 1
