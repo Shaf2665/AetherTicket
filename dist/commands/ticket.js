@@ -193,10 +193,33 @@ async function execute(interaction, config) {
             // Delete channel after delay
             setTimeout(async () => {
                 try {
-                    await textChannel.delete();
+                    // Check if bot has permission to delete the channel
+                    const botMember = await interaction.guild.members.fetch(interaction.client.user.id);
+                    const permissions = textChannel.permissionsFor(botMember);
+                    if (permissions && permissions.has(discord_js_1.PermissionFlagsBits.ManageChannels)) {
+                        await textChannel.delete('Ticket closed');
+                        logger_1.logger.info(`Ticket channel deleted: ${textChannel.id}`);
+                    }
+                    else {
+                        logger_1.logger.error(`Bot does not have permission to delete channel ${textChannel.id}`);
+                        // Send a message to the channel instead
+                        try {
+                            await textChannel.send('⚠️ This ticket has been closed. Please delete this channel manually or grant the bot permission to delete channels.');
+                        }
+                        catch (sendError) {
+                            logger_1.logger.error('Failed to send fallback message:', sendError);
+                        }
+                    }
                 }
                 catch (error) {
                     logger_1.logger.error('Failed to delete ticket channel:', error);
+                    // Try to send a message as fallback
+                    try {
+                        await textChannel.send('⚠️ This ticket has been closed. Please delete this channel manually.');
+                    }
+                    catch (sendError) {
+                        logger_1.logger.error('Failed to send fallback message:', sendError);
+                    }
                 }
             }, 5000);
         }
