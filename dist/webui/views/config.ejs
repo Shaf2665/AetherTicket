@@ -261,10 +261,12 @@
           avatarFormData.append('avatar', avatarFile);
           
           try {
-            const avatarRes = await fetch('/api/avatar', {
-              method: 'POST',
-              body: avatarFormData
-            });
+          // Use window.location.origin to ensure we use the same protocol (HTTP) as the page
+          const avatarUrl = `${window.location.origin}/api/avatar`;
+          const avatarRes = await fetch(avatarUrl, {
+            method: 'POST',
+            body: avatarFormData
+          });
             
             if (!avatarRes.ok) {
               let errorMessage = 'Failed to upload avatar';
@@ -305,7 +307,9 @@
           return;
         }
         
-        const res = await fetch('/api/config', {
+        // Use window.location.origin to ensure we use the same protocol (HTTP) as the page
+        const apiUrl = `${window.location.origin}/api/config`;
+        const res = await fetch(apiUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
