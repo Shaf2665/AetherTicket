@@ -151,12 +151,28 @@ async function execute(interaction, config) {
                 });
                 return;
             }
-            // Get channel messages for transcript
-            const messages = await textChannel.messages.fetch({ limit: 100 });
-            const transcript = messages
-                .map((msg) => `[${msg.createdAt.toISOString()}] ${msg.author.tag}: ${msg.content}`)
-                .reverse()
-                .join('\n');
+            // Get channel messages for transcript (check permissions first)
+            let transcript = '';
+            try {
+                // Check if bot has permission to read message history
+                const botMember = await interaction.guild.members.fetch(interaction.client.user.id);
+                const permissions = textChannel.permissionsFor(botMember);
+                if (permissions && permissions.has(discord_js_1.PermissionFlagsBits.ReadMessageHistory)) {
+                    const messages = await textChannel.messages.fetch({ limit: 100 });
+                    transcript = messages
+                        .map((msg) => `[${msg.createdAt.toISOString()}] ${msg.author.tag}: ${msg.content}`)
+                        .reverse()
+                        .join('\n');
+                }
+                else {
+                    logger_1.logger.warn(`Bot does not have permission to read message history in channel ${textChannel.id}`);
+                    transcript = 'Transcript unavailable: Bot does not have permission to read message history.';
+                }
+            }
+            catch (error) {
+                logger_1.logger.error(`Failed to fetch messages for transcript: ${error}`);
+                transcript = 'Transcript unavailable: Failed to fetch messages.';
+            }
             // Create closing embed
             const embed = new discord_js_1.EmbedBuilder()
                 .setColor(config.embedColor)
