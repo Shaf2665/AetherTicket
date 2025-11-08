@@ -276,6 +276,19 @@
           body: JSON.stringify(configData)
         });
         
+        if (!res.ok) {
+          // Try to parse error response
+          let errorMessage = 'Failed to save configuration';
+          try {
+            const errorData = await res.json();
+            errorMessage = errorData.error || errorMessage;
+          } catch {
+            errorMessage = `Server error: ${res.status} ${res.statusText}`;
+          }
+          showStatus('Error: ' + errorMessage, 'error');
+          return;
+        }
+        
         const data = await res.json();
         
         if (data.success) {
@@ -284,7 +297,7 @@
           showStatus('Error: ' + (data.error || 'Failed to save configuration'), 'error');
         }
       } catch (error) {
-        showStatus('Error: ' + error.message, 'error');
+        showStatus('Error: ' + (error.message || 'Network error - please check your connection'), 'error');
       }
     });
 

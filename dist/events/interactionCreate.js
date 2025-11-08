@@ -3,9 +3,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.once = exports.name = void 0;
 exports.execute = execute;
 const logger_1 = require("../utils/logger");
+const configLoader_1 = require("../utils/configLoader");
 exports.name = 'interactionCreate';
 exports.once = false;
-async function execute(interaction, client, config) {
+async function execute(interaction, client, _config) {
     if (!interaction.isChatInputCommand())
         return;
     const command = client.commands?.get(interaction.commandName);
@@ -13,6 +14,8 @@ async function execute(interaction, client, config) {
         logger_1.logger.warn(`No command matching ${interaction.commandName} was found.`);
         return;
     }
+    // Reload config on each command execution to pick up WebUI changes
+    const config = (0, configLoader_1.loadConfig)();
     try {
         await command.execute(interaction, config);
     }

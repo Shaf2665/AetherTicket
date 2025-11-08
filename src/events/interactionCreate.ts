@@ -1,11 +1,11 @@
 import { Interaction, Client } from 'discord.js';
 import { logger } from '../utils/logger';
-import { BotConfig } from '../utils/configLoader';
+import { loadConfig } from '../utils/configLoader';
 
 export const name = 'interactionCreate';
 export const once = false;
 
-export async function execute(interaction: Interaction, client: Client, config: BotConfig) {
+export async function execute(interaction: Interaction, client: Client, _config: unknown) {
   if (!interaction.isChatInputCommand()) return;
 
   const command = client.commands?.get(interaction.commandName);
@@ -14,6 +14,9 @@ export async function execute(interaction: Interaction, client: Client, config: 
     logger.warn(`No command matching ${interaction.commandName} was found.`);
     return;
   }
+
+  // Reload config on each command execution to pick up WebUI changes
+  const config = loadConfig();
 
   try {
     await command.execute(interaction, config);
