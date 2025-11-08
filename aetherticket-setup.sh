@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-SCRIPT_VERSION="2.4.7"
+SCRIPT_VERSION="2.4.8"
 INSTALL_DIR_DEFAULT="$HOME/AetherTicket"
 LOG_FILE="/tmp/aetherticket-install.log"
 LOCK_FILE="/tmp/aetherticket-install.lock"
@@ -511,12 +511,12 @@ write_env_file() {
     exit 1
   fi
   
-  # Create .env file
+  # Create .env file with quoted values for safety
   cat >"$tmp_file" <<EOF
-DISCORD_TOKEN=$DISCORD_TOKEN
-CLIENT_ID=$CLIENT_ID
-GUILD_ID=${GUILD_ID}
-PORT=${PORT_VALUE}
+DISCORD_TOKEN="$DISCORD_TOKEN"
+CLIENT_ID="$CLIENT_ID"
+GUILD_ID="${GUILD_ID}"
+PORT="${PORT_VALUE}"
 EOF
   
   # Verify file was created successfully
@@ -587,17 +587,21 @@ validate_env_file() {
     exit 1
   fi
   
-  # Check that values are not empty
-  # shellcheck disable=SC1090
-  source "$ENV_FILE"
+  # Check that values are not empty by reading the file directly
+  # Extract values using grep to avoid sourcing issues
+  local token_value
+  local client_id_value
   
-  if [[ -z "${DISCORD_TOKEN:-}" ]]; then
+  token_value=$(grep "^DISCORD_TOKEN=" "$ENV_FILE" | cut -d'=' -f2- | sed 's/^"//;s/"$//' || echo "")
+  client_id_value=$(grep "^CLIENT_ID=" "$ENV_FILE" | cut -d'=' -f2- | sed 's/^"//;s/"$//' || echo "")
+  
+  if [[ -z "$token_value" ]]; then
     log_error "DISCORD_TOKEN is empty in .env file."
     log_error "Please re-run the installer and provide a valid Discord Bot Token."
     exit 1
   fi
   
-  if [[ -z "${CLIENT_ID:-}" ]]; then
+  if [[ -z "$client_id_value" ]]; then
     log_error "CLIENT_ID is empty in .env file."
     log_error "Please re-run the installer and provide a valid Client ID."
     exit 1
@@ -640,6 +644,12 @@ else
 fi
 
 # Write .env file after git clone completes (to avoid deletion during fresh install)
+# Ensure we're in the install directory for .env file creation
+if [[ ! -d "$INSTALL_DIR" ]]; then
+  log_error "Installation directory $INSTALL_DIR does not exist."
+  exit 1
+fi
+
 if [[ "$reuse_env" == true ]] && [[ -n "$ENV_BACKUP" ]] && [[ -f "$ENV_BACKUP" ]]; then
   # Restore .env file from backup
   cp "$ENV_BACKUP" "$ENV_FILE"
@@ -655,6 +665,13 @@ else
   validate_env_file
   # Clean up backup if it exists
   [[ -n "$ENV_BACKUP" ]] && rm -f "$ENV_BACKUP"
+fi
+
+# Verify .env file exists in the correct location
+if [[ ! -f "$ENV_FILE" ]]; then
+  log_error ".env file was not created at $ENV_FILE"
+  log_error "Please check permissions and try again."
+  exit 1
 fi
 
 # Ensure essential directories exist with secure permissions
