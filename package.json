@@ -1,6 +1,6 @@
 {
   "name": "aetherticket",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "description": "Self-hosted, white-label Discord Ticket Bot",
   "main": "dist/index.js",
   "scripts": {

@@ -83,7 +83,12 @@
       margin-top: 10px;
     }
     .file-upload input[type="file"] {
-      display: none;
+      position: absolute;
+      width: 0.1px;
+      height: 0.1px;
+      opacity: 0;
+      overflow: hidden;
+      z-index: -1;
     }
     .file-upload label {
       display: inline-block;
@@ -93,9 +98,13 @@
       border-radius: 6px;
       cursor: pointer;
       transition: background 0.3s;
+      user-select: none;
     }
     .file-upload label:hover {
       background: #5568d3;
+    }
+    .file-upload label:active {
+      background: #4455c2;
     }
     button {
       background: #667eea;
@@ -184,8 +193,8 @@
             </div>
           <% } %>
           <div class="file-upload">
+            <input type="file" id="avatarUpload" name="avatar" accept="image/png,image/jpeg,image/webp">
             <label for="avatarUpload">Upload New Avatar</label>
-            <input type="file" id="avatarUpload" name="avatar" accept="image/*">
           </div>
         </div>
       </div>
@@ -235,39 +244,67 @@
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       
-      const formData = new FormData(form);
-      const avatarFile = avatarUpload?.files[0];
-      
-      // Upload avatar if changed
-      if (avatarFile) {
-        const avatarFormData = new FormData();
-        avatarFormData.append('avatar', avatarFile);
-        
-        try {
-          const avatarRes = await fetch('/api/avatar', {
-            method: 'POST',
-            body: avatarFormData
-          });
-          
-          if (!avatarRes.ok) {
-            throw new Error('Failed to upload avatar');
-          }
-        } catch (error) {
-          showStatus('Error uploading avatar: ' + error.message, 'error');
-          return;
-        }
+      // Disable submit button to prevent double submission
+      const submitButton = form.querySelector('button[type="submit"]');
+      if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.textContent = 'Saving...';
       }
       
-      // Update config
-      const configData = {
-        botName: formData.get('botName'),
-        embedColor: formData.get('embedColor'),
-        footerText: formData.get('footerText'),
-        ticketCategory: formData.get('ticketCategory'),
-        supportRole: formData.get('supportRole')
-      };
-      
       try {
+        const formData = new FormData(form);
+        const avatarFile = avatarUpload?.files[0];
+        
+        // Upload avatar if changed
+        if (avatarFile) {
+          const avatarFormData = new FormData();
+          avatarFormData.append('avatar', avatarFile);
+          
+          try {
+            const avatarRes = await fetch('/api/avatar', {
+              method: 'POST',
+              body: avatarFormData
+            });
+            
+            if (!avatarRes.ok) {
+              let errorMessage = 'Failed to upload avatar';
+              try {
+                const errorData = await avatarRes.json();
+                errorMessage = errorData.error || errorMessage;
+              } catch {
+                errorMessage = `Server error: ${avatarRes.status} ${avatarRes.statusText}`;
+              }
+              throw new Error(errorMessage);
+            }
+          } catch (error) {
+            showStatus('Error uploading avatar: ' + error.message, 'error');
+            if (submitButton) {
+              submitButton.disabled = false;
+              submitButton.textContent = 'Save Configuration';
+            }
+            return;
+          }
+        }
+        
+        // Update config - extract values directly from form inputs
+        const configData = {
+          botName: document.getElementById('botName')?.value || '',
+          embedColor: document.getElementById('embedColor')?.value || '#5865F2',
+          footerText: document.getElementById('footerText')?.value || '',
+          ticketCategory: document.getElementById('ticketCategory')?.value || '',
+          supportRole: document.getElementById('supportRole')?.value || ''
+        };
+        
+        // Validate required fields
+        if (!configData.botName || !configData.ticketCategory || !configData.supportRole) {
+          showStatus('Error: Bot Name, Ticket Category, and Support Role are required', 'error');
+          if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.textContent = 'Save Configuration';
+          }
+          return;
+        }
+        
         const res = await fetch('/api/config', {
           method: 'POST',
           headers: {
@@ -286,6 +323,10 @@
             errorMessage = `Server error: ${res.status} ${res.statusText}`;
           }
           showStatus('Error: ' + errorMessage, 'error');
+          if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.textContent = 'Save Configuration';
+          }
           return;
         }
         
@@ -293,11 +334,24 @@
         
         if (data.success) {
           showStatus('Configuration saved successfully!', 'success');
+          // Reload page after 1 second to show updated values
+          setTimeout(() => {
+            window.location.reload();
+          }, 1000);
         } else {
           showStatus('Error: ' + (data.error || 'Failed to save configuration'), 'error');
+          if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.textContent = 'Save Configuration';
+          }
         }
       } catch (error) {
+        console.error('Error saving configuration:', error);
         showStatus('Error: ' + (error.message || 'Network error - please check your connection'), 'error');
+        if (submitButton) {
+          submitButton.disabled = false;
+          submitButton.textContent = 'Save Configuration';
+        }
       }
     });
 

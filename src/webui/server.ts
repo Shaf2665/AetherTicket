@@ -172,9 +172,7 @@ export function startWebUI(port: number, _config: BotConfig, client: Client) {
   // Update config API
   app.post('/api/config', (req, res) => {
     try {
-      const currentConfig = normalizeConfig(loadConfig());
-      const updatedConfig = normalizeConfig({
-        ...currentConfig,
+      logger.info('Config update request received:', {
         botName: req.body.botName,
         embedColor: req.body.embedColor,
         footerText: req.body.footerText,
@@ -182,7 +180,19 @@ export function startWebUI(port: number, _config: BotConfig, client: Client) {
         supportRole: req.body.supportRole,
       });
 
+      const currentConfig = normalizeConfig(loadConfig());
+      const updatedConfig = normalizeConfig({
+        ...currentConfig,
+        botName: req.body.botName || currentConfig.botName,
+        embedColor: req.body.embedColor || currentConfig.embedColor,
+        footerText: req.body.footerText || currentConfig.footerText,
+        ticketCategory: req.body.ticketCategory || currentConfig.ticketCategory,
+        supportRole: req.body.supportRole || currentConfig.supportRole,
+      });
+
       if (saveConfig(updatedConfig)) {
+        logger.info('Config saved successfully:', updatedConfig);
+        
         // Update bot name if changed
         if (updatedConfig.botName !== currentConfig.botName && client.user) {
           client.user.setUsername(updatedConfig.botName).catch((err) => {
@@ -192,11 +202,15 @@ export function startWebUI(port: number, _config: BotConfig, client: Client) {
 
         res.json({ success: true, config: updatedConfig });
       } else {
+        logger.error('Failed to save config file');
         res.status(500).json({ success: false, error: 'Failed to save config' });
       }
     } catch (error) {
       logger.error('Failed to update config:', error);
-      res.status(500).json({ success: false, error: 'Failed to update config' });
+      res.status(500).json({ 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Failed to update config' 
+      });
     }
   });
 

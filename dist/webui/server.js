@@ -178,16 +178,24 @@ function startWebUI(port, _config, client) {
     // Update config API
     app.post('/api/config', (req, res) => {
         try {
-            const currentConfig = (0, validation_1.normalizeConfig)((0, configLoader_1.loadConfig)());
-            const updatedConfig = (0, validation_1.normalizeConfig)({
-                ...currentConfig,
+            logger_1.logger.info('Config update request received:', {
                 botName: req.body.botName,
                 embedColor: req.body.embedColor,
                 footerText: req.body.footerText,
                 ticketCategory: req.body.ticketCategory,
                 supportRole: req.body.supportRole,
             });
+            const currentConfig = (0, validation_1.normalizeConfig)((0, configLoader_1.loadConfig)());
+            const updatedConfig = (0, validation_1.normalizeConfig)({
+                ...currentConfig,
+                botName: req.body.botName || currentConfig.botName,
+                embedColor: req.body.embedColor || currentConfig.embedColor,
+                footerText: req.body.footerText || currentConfig.footerText,
+                ticketCategory: req.body.ticketCategory || currentConfig.ticketCategory,
+                supportRole: req.body.supportRole || currentConfig.supportRole,
+            });
             if ((0, configLoader_1.saveConfig)(updatedConfig)) {
+                logger_1.logger.info('Config saved successfully:', updatedConfig);
                 // Update bot name if changed
                 if (updatedConfig.botName !== currentConfig.botName && client.user) {
                     client.user.setUsername(updatedConfig.botName).catch((err) => {
@@ -197,12 +205,16 @@ function startWebUI(port, _config, client) {
                 res.json({ success: true, config: updatedConfig });
             }
             else {
+                logger_1.logger.error('Failed to save config file');
                 res.status(500).json({ success: false, error: 'Failed to save config' });
             }
         }
         catch (error) {
             logger_1.logger.error('Failed to update config:', error);
-            res.status(500).json({ success: false, error: 'Failed to update config' });
+            res.status(500).json({
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to update config'
+            });
         }
     });
     // Avatar upload
