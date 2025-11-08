@@ -58,6 +58,7 @@ async function execute(interaction, config) {
                 }
             }
             // Create ticket channel
+            const botMember = await guild.members.fetch(interaction.client.user.id);
             const ticketChannel = await guild.channels.create({
                 name: `ticket-${user.id}`,
                 type: discord_js_1.ChannelType.GuildText,
@@ -73,6 +74,15 @@ async function execute(interaction, config) {
                             discord_js_1.PermissionFlagsBits.ViewChannel,
                             discord_js_1.PermissionFlagsBits.SendMessages,
                             discord_js_1.PermissionFlagsBits.ReadMessageHistory,
+                        ],
+                    },
+                    {
+                        id: botMember.id,
+                        allow: [
+                            discord_js_1.PermissionFlagsBits.ViewChannel,
+                            discord_js_1.PermissionFlagsBits.SendMessages,
+                            discord_js_1.PermissionFlagsBits.ReadMessageHistory,
+                            discord_js_1.PermissionFlagsBits.ManageChannels,
                         ],
                     },
                 ],
@@ -93,8 +103,20 @@ async function execute(interaction, config) {
                 .setDescription(`Hello ${user}, welcome to your support ticket!\n\nPlease describe your issue and a staff member will assist you shortly.`)
                 .setFooter({ text: config.footerText })
                 .setTimestamp();
-            await ticketChannel.send({ embeds: [embed] });
-            await ticketChannel.send(`<@${user.id}>`);
+            // Reply to interaction first (before database operation)
+            await interaction.reply({
+                content: `Ticket created: ${ticketChannel}`,
+                ephemeral: true,
+            });
+            // Send welcome messages to ticket channel
+            try {
+                await ticketChannel.send({ embeds: [embed] });
+                await ticketChannel.send(`<@${user.id}>`);
+            }
+            catch (error) {
+                logger_1.logger.error(`Failed to send welcome messages to ticket channel: ${error}`);
+                // Continue anyway - the channel was created successfully
+            }
             // Log to database (handle errors gracefully)
             try {
                 await (0, database_1.createTicket)(ticketChannel.id, user.id);
@@ -105,10 +127,6 @@ async function execute(interaction, config) {
                 // Continue anyway - the channel was created successfully
                 // The ticket can still be used, but won't be tracked in the database
             }
-            await interaction.reply({
-                content: `Ticket created: ${ticketChannel}`,
-                ephemeral: true,
-            });
         }
         else if (subcommand === 'close') {
             const channel = interaction.channel;

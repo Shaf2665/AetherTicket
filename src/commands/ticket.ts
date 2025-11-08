@@ -86,6 +86,7 @@ export async function execute(interaction: ChatInputCommandInteraction, config: 
       }
 
       // Create ticket channel
+      const botMember = await guild.members.fetch(interaction.client.user!.id);
       const ticketChannel = await guild.channels.create({
         name: `ticket-${user.id}`,
         type: ChannelType.GuildText,
@@ -101,6 +102,15 @@ export async function execute(interaction: ChatInputCommandInteraction, config: 
               PermissionFlagsBits.ViewChannel,
               PermissionFlagsBits.SendMessages,
               PermissionFlagsBits.ReadMessageHistory,
+            ],
+          },
+          {
+            id: botMember.id,
+            allow: [
+              PermissionFlagsBits.ViewChannel,
+              PermissionFlagsBits.SendMessages,
+              PermissionFlagsBits.ReadMessageHistory,
+              PermissionFlagsBits.ManageChannels,
             ],
           },
         ],
@@ -126,8 +136,20 @@ export async function execute(interaction: ChatInputCommandInteraction, config: 
         .setFooter({ text: config.footerText })
         .setTimestamp();
 
-      await ticketChannel.send({ embeds: [embed] });
-      await ticketChannel.send(`<@${user.id}>`);
+      // Reply to interaction first (before database operation)
+      await interaction.reply({
+        content: `Ticket created: ${ticketChannel}`,
+        ephemeral: true,
+      });
+
+      // Send welcome messages to ticket channel
+      try {
+        await ticketChannel.send({ embeds: [embed] });
+        await ticketChannel.send(`<@${user.id}>`);
+      } catch (error) {
+        logger.error(`Failed to send welcome messages to ticket channel: ${error}`);
+        // Continue anyway - the channel was created successfully
+      }
 
       // Log to database (handle errors gracefully)
       try {
@@ -138,11 +160,6 @@ export async function execute(interaction: ChatInputCommandInteraction, config: 
         // Continue anyway - the channel was created successfully
         // The ticket can still be used, but won't be tracked in the database
       }
-
-      await interaction.reply({
-        content: `Ticket created: ${ticketChannel}`,
-        ephemeral: true,
-      });
     } else if (subcommand === 'close') {
       const channel = interaction.channel;
       if (!channel || channel.type !== ChannelType.GuildText) {
