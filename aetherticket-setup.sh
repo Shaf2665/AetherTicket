@@ -511,13 +511,18 @@ write_env_file() {
     exit 1
   fi
   
+  # Trim carriage returns and trailing whitespace from all variables before writing
+  DISCORD_TOKEN=$(echo -n "$DISCORD_TOKEN" | tr -d '\r\n' | sed 's/[[:space:]]*$//')
+  CLIENT_ID=$(echo -n "$CLIENT_ID" | tr -d '\r\n' | sed 's/[[:space:]]*$//')
+  GUILD_ID=$(echo -n "${GUILD_ID}" | tr -d '\r\n' | sed 's/[[:space:]]*$//')
+  PORT_VALUE=$(echo -n "${PORT_VALUE}" | tr -d '\r\n' | sed 's/[[:space:]]*$//')
+  
   # Create .env file with quoted values for safety
   cat >"$tmp_file" <<EOF
-# Trim carriage returns and trailing whitespace from all variables
-DISCORD_TOKEN=$(echo -n "$DISCORD_TOKEN" | tr -d '\r\n' | sed 's/[[:space:]]*$//')
-CLIENT_ID=$(echo -n "$CLIENT_ID" | tr -d '\r\n' | sed 's/[[:space:]]*$//')
-GUILD_ID=$(echo -n "${GUILD_ID}" | tr -d '\r\n' | sed 's/[[:space:]]*$//')
-PORT_VALUE=$(echo -n "${PORT_VALUE}" | tr -d '\r\n' | sed 's/[[:space:]]*$//')
+DISCORD_TOKEN="$DISCORD_TOKEN"
+CLIENT_ID="$CLIENT_ID"
+GUILD_ID="${GUILD_ID}"
+PORT="${PORT_VALUE}"
 EOF
   
   # Verify file was created successfully
