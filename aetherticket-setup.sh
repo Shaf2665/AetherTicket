@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-SCRIPT_VERSION="2.4.3"
+SCRIPT_VERSION="2.4.4"
 INSTALL_DIR_DEFAULT="$HOME/AetherTicket"
 LOG_FILE="/tmp/aetherticket-install.log"
 LOCK_FILE="/tmp/aetherticket-install.lock"
@@ -510,12 +510,6 @@ EOF
   log_info "Saved credentials to .env (permissions set to 600)."
 }
 
-if [[ "$reuse_env" == false ]]; then
-  write_env_file
-else
-  log_info "Reusing existing credentials."
-fi
-
 log_info "Cloning AetherTicket source from GitHub..."
 if [[ -d "$INSTALL_DIR/.git" ]]; then
   git -C "$INSTALL_DIR" fetch --tags --prune origin
@@ -538,6 +532,13 @@ else
       exit 1
     fi
   fi
+fi
+
+# Write .env file after git clone completes (to avoid deletion during fresh install)
+if [[ "$reuse_env" == true ]] && [[ -f "$ENV_FILE" ]]; then
+  log_info "Reusing existing credentials from .env file."
+else
+  write_env_file
 fi
 
 # Ensure essential directories exist with secure permissions
