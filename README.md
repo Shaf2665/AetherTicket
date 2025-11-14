@@ -1,4 +1,4 @@
-# AetherTicket v2.3.6 (Audit Build)
+# AetherTicket - Discontinued 
 
 A free, self-hosted, white-label Discord Ticket Bot that lets you manage support tickets effortlessly — and make it your own.
 
